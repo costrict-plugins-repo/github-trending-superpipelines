@@ -1,0 +1,550 @@
+# Superpipelines — Release Notes
+
+> Canonical record of versioned changes, feature additions, and removals for the Superpipelines framework. This document serves as the primary reference for tracking migration paths and architectural evolution.
+
+<overview>
+Superpipelines release notes document the evolution from legacy Superpowers-era infrastructure to the standalone v2.4.0 architecture. Key milestones include scope-aware deployment, multi-pipeline isolation, the five-tier multi-platform execution model, the Lean Agents zero-body architecture, the brief-hardening grilling gate, the worktree artifact-safety hardening introduced in v2.1.1, the audit-report-ownership and agent `permissionMode` consistency fixes in v2.1.2, the run-safety audit gate (pre-run tripwire, deterministic platform_profile merge, defensive finalization) in v2.1.3, the on-demand pipeline optimizer in v2.2.0, the phase-skip safety hardening in v2.2.1, the Codex native layout migration in v2.2.2, the self-contained Codex marketplace package in v2.2.3, the unified single-root, data-only pipeline architecture with materialize-at-runtime dispatch in v2.3.0, the Codex agent TOML schema fix with regression guard in v2.3.1, CAD hygiene hardening in v2.3.2, refined isolation/delete-step safety guards in v2.4.0, and the trust/CI-enforcement overhaul with Codex live-host verification in v2.5.0.
+</overview>
+
+## v2.5.0 — Trust, CI Enforcement & Codex Live Verification (2026-07-02)
+
+Closes the gap between what the project claims and what is enforced: install commands are generated from the installer and CI-checked, the repository's own guards (profiles, authoring rules, materialization parity, version agreement) run on every PR, and the Codex tier's schema and isolation behavior are now grounded in live-host evidence rather than documentation reading — including an honest host-conditional downgrade of the Codex reviewer-isolation claim on unsandboxed sessions.
+
+<release_entry version="2.5.0" status="STABLE">
+
+### Added
+
+- **v3 spec + execution plan + competitive analysis** (#88) — a 12-gap register with acceptance criteria, an 18-item dependency-ordered fix plan, a Copilot CLI tier proposal, and the Wave 3 live-host handoff.
+- **Five-job CI** (#88) — version agreement (6 targets), profile schema validation with fixture behavior, authoring lints + model-ID drift detection, preload-budget report, materialization-parity gate (all golden fixtures reproduced per PR), and a 3-OS installer smoke matrix. Every job mirrored 1:1 by an npm script (`npm run check:all`).
+- **Install-table generator** (#88) — the README Quick-Start table renders from `bin/install.js` and diverging edits fail CI; Tier 2 gets a documented manual-install fallback.
+- **PRIVACY.md + manifest URL integrity** (#88) — dead marketplace links are now impossible.
+- **Monthly profile-drift review** (#88) — a scheduled workflow opens a re-verification checklist issue; releases gate on it.
+- **Codex live-host verification transcripts** (#89) — install grammar, nested agent discovery, TOML schema, and isolation probes on Codex CLI 0.142.5.
+
+### Safety
+
+- **Codex reviewer isolation is now host-conditional** — live Probe D showed per-agent `sandbox_mode = "read-only"` is NOT enforced when the session runs `danger-full-access` or the host lacks sandbox helpers. tier_1d ships `extensions.isolation_unsandboxed_warning` and dispatch adds a mandatory runtime guard: on unsandboxed sessions reviewer verdicts degrade to advisory with the warning surfaced and stamped into `metadata.isolation_warning`. Structural enforcement stands on sandbox-capable hosts; a re-probe on a Hyper-V-capable machine remains open.
+- **`PERMISSION_MODE` honesty** (#88) — plugin-shipped agents rely structurally on `tools:`/`disallowedTools:` alone (Claude Code ignores `permissionMode` on the plugin path); materialized project-scope agents keep full enforcement. Auditor BUNDLE-08 flags contrary claims.
+
+### Changed
+
+- **Codex agent TOML schema (live-verified)** — translator, goldens, parity harness, and packager now emit/require `description` + scalar `developer_instructions`, drop `turn_limit`, and use an identity effort map (`low → low`).
+- **`PARITY_TESTING`** — `MANUAL_PHASE1` → `TRANSLATION_AUTOMATED_DISPATCH_MANUAL`; the CAD → native translation layer is CI-gated.
+- **Antigravity (Tier 1c)** moved from the headline tier matrices to an honest Roadmap section.
+
+### Fixed
+
+- **CC `effort` capability drift** — tier_1 now emits `effort:` in materialized agents (was silently dropped).
+- **Stale model IDs** — opus-4-7/gemini-3.1-pro references corrected across four skills and lint-enforced against recurrence.
+- **Codex installer syntax** (#89) — verified live; the long-standing "pending verification" caveat is retired.
+
+</release_entry>
+
+## v2.4.0 — Isolation & Delete-Step Guards (2026-06-28)
+
+Refines runtime safety gates so artifact-only data pipelines can use richer patterns on non-worktree runtimes while tracked-source writer isolation and delete-step staging completeness remain hard-guarded.
+
+<release_entry version="2.4.0" status="STABLE">
+
+### Added
+
+- **Worktree gating regression guard** (#86) — fixture-backed validation distinguishes artifact-only Pattern 3 data pipelines from tracked-code Pattern 3 pipelines, proving the former can proceed on `worktrees:false` runtimes while the latter still hard-aborts.
+- **Delete-step staging guard** (#85) — package validation now checks that STEP-DELETE requires a completion manifest and that Phase 2 has explicit markdown staging guards.
+
+### Changed
+
+- **Pattern isolation semantics** (#86) — Phase 0.6 now computes `requires_tracked_source_isolation` from CAD/legacy step intent instead of treating Pattern 2/3/5 as a blanket worktree requirement.
+- **Pipeline creation gating** (#86) — Pattern selection now asks whether the workflow edits tracked source before excluding Pattern 2/3/5 on `worktrees:false` platforms; artifact-only workflows can still use Superpipelines-native run-dir/state isolation.
+
+### Fixed
+
+- **Delete-step partial exits** (#85) — `deleting-a-pipeline-step` blocks before delta audit when expected markdown is listed as `copied-unchanged` or staged byte-identical to production.
+- **STEP-DELETE architect reporting** (#85) — `pipeline-architect-protocol` requires a per-file completion manifest with `edited`, `copied-unchanged`, and `deleted` statuses.
+
+</release_entry>
+
+## v2.3.2 — CAD Hygiene Hardening (2026-06-19)
+
+Hardens the Canonical Agent Def authoring and validation contract. The release adds executable hygiene validation, expands auditor and architect guidance for CAD context discipline, keeps invocation flags separate from skill metadata, and syncs the packaged Codex skill bundle so marketplace installs receive the same checks and protocol updates.
+
+<release_entry version="2.3.2" status="STABLE">
+
+### Added
+
+- **Executable CAD hygiene validation** — package checks now cover CAD fixture validity, bundled skill hygiene, invocation metadata separation, and context-size regressions.
+- **CAD and bundle hygiene audit rules** — auditor guidance now includes concrete CAD contradiction, bundle hygiene, public command preservation, reference extraction, and scaffold summary checks.
+
+### Changed
+
+- **CAD generation contract** — generated CADs now preserve lightweight context by keeping runtime invocation metadata separate from skill metadata and by referencing source artifacts instead of embedding unnecessary bulk.
+- **Packaged Codex skills** — the marketplace package mirrors the updated root skills and fixtures.
+
+### Fixed
+
+- **CAD hygiene review findings** — review feedback from the CAD hygiene update is incorporated across docs, fixtures, validation, and packaged assets.
+
+</release_entry>
+
+## v2.3.1 — Codex Agent Schema Fix (2026-06-16)
+
+Corrects the Codex agent role schema so Codex v0.139.0 loads Superpipelines agents instead of rejecting them at startup. The checked-in Codex agent TOMLs now use a scalar `instructions` field rather than the `[[developer_instructions]]` array-of-tables that Codex parsed as `invalid type: sequence, expected a string`. A package guard fails on reintroduction of the bad shape. Also clears a source-of-truth drift where the dispatch skill still named the retired `OC_NOT_PORTABLE` invariant.
+
+<release_entry version="2.3.1" status="STABLE">
+
+### Fixed
+
+- **Codex agent TOML schema** (#79) — scalar `instructions = """..."""` replaces `[[developer_instructions]]`; metadata (`name`, `description`, `model`, `model_reasoning_effort`, `sandbox_mode`) preserved. Codex no longer ignores agent roles at startup.
+- **Invariant drift** (#66) — `sk-platform-dispatch/SKILL.md` (root + marketplace mirror) updated from the retired `CC_AND_CODEX_TO_TIER2; OC_NOT_PORTABLE` to `DATA_ONLY_PORTABLE_ALL_TIERS` (ADR-0003).
+
+### Safety
+
+- **Regression guard** (#79) — `check:codex-plugin` fails when committed or materialized Codex agent TOMLs reintroduce `[[developer_instructions]]` or omit scalar `instructions`.
+
+### Documentation
+
+- Stale current-facing Codex schema/root docs corrected to scalar `instructions` and `.codex`.
+
+</release_entry>
+
+## v2.3.0 — Unified Data-Only Pipelines (2026-06-14)
+
+Re-architects generated pipelines as tool-neutral **data** under a single `.superpipelines/` root, replacing the per-tier native-plugin layout. The orchestrator materializes each Canonical Agent Def into the host's native agent dialect at dispatch time and treats it as disposable cache — preserving the structural write/review isolation boundary on Claude Code, OpenCode, and Codex, and running convention-only with surfaced degradation on Antigravity and Tier 2. Pipelines become copy-paste portable across tools and projects; the former `OC_NOT_PORTABLE` constraint is lifted. ADR-0003 records the single-root + materialize-at-runtime + dual-read rollout decision.
+
+<release_entry version="2.3.0" status="STABLE">
+
+### Added
+
+- **Single artifact root** — generated pipelines live under one `.superpipelines/` data root (Canonical Agent Defs, step protocols, entry body) resolved by `RESOLVE_DATA_ROOT`. Nothing generated is tool-registered.
+- **Materialize-at-runtime dispatch (Option A)** — `TRANSLATE_CAD_TO_CC/OC/CODEX` translate the same canonical def into native agent files just before dispatch, preserving structural `WRITE_REVIEW_ISOLATION`; the files are disposable cache (regenerated every run, cleaned on completion).
+- **`migrate-pipeline`** (#68) — one-shot move of an existing per-tier pipeline into `.superpipelines/` with registry rewrite.
+- **ADR-0003** — single-root, data-only pipelines with materialize-at-runtime dispatch.
+
+### Changed
+
+- **Phase 0 collapse** — two registry reads replace the five-root per-tier enumeration; `PORTABILITY_REWRITE` retires for paths.
+- **Portability upgrade** — OpenCode pipelines materialize structurally from the same CAD as every other Tier 1 host; `ARTIFACT_PORTABILITY` becomes `DATA_ONLY_PORTABLE_ALL_TIERS`.
+
+### Migration
+
+- Existing per-tier pipelines keep listing and resuming via a read-only back-compat path for one major. Old-root *writes* are removed now. Run `/superpipelines:migrate-pipeline` to relocate a pipeline under `.superpipelines/`. Minor bump — no breaking changes this major.
+
+</release_entry>
+
+## v2.2.3 — Codex Marketplace Packaging (2026-06-10)
+
+Makes the Codex marketplace package self-contained for user-level installs. The packaged plugin now ships its own `skills/`, `README.md`, and `LICENSE`, uses a Codex-valid `"skills": "./skills/"` manifest path, and includes release checks that prove packaged skills mirror the root source tree before publishing.
+
+<release_entry version="2.2.3" status="STABLE">
+
+### Added
+
+- **Self-contained Codex package** — `plugins/superpipelines/` now contains `.codex-plugin/`, `skills/`, `README.md`, and `LICENSE`, so Codex caches bundled skills from the plugin root instead of a manifest-only package.
+- **Packaging guard** — `scripts/package-codex-plugin.js` plus npm scripts `package:codex` and `check:codex-plugin` sync and validate the packaged Codex plugin.
+
+### Fixed
+
+- **Codex marketplace skills loading** (#52) — packaged manifest paths no longer escape the plugin root. `plugins/superpipelines/.codex-plugin/plugin.json` uses `"skills": "./skills/"` and omits unsupported `agents`/`commands` fields.
+- **Codex cache version** — Codex manifests are bumped to `2.2.3`, ensuring the fixed marketplace package installs under a new cache version rather than reusing the stale `2.1.3` cache.
+
+### Safety
+
+- **Source/package mirror validation** — `check:codex-plugin` compares root `skills/` and packaged `plugins/superpipelines/skills/` by relative file list and file contents, failing on missing, extra, or stale packaged files.
+
+### Documentation
+
+- **Design spec + implementation plan** — `docs/superpowers/specs/2026-06-09-codex-marketplace-packaging-design.md` and `docs/superpowers/plans/2026-06-09-codex-marketplace-packaging.md`.
+
+</release_entry>
+
+## v2.2.2 — Codex Native Layout Migration (2026-06-09)
+
+Migrates the Codex plugin (Tier 1d) from a non-standard `.agents/codex/` layout to Codex-native discovery paths, fully aligning with the official Codex plugin manifest and agent TOML specifications. Agent definitions move from `skills = ["name"]` references to scalar `instructions = """..."""` prompt fields, non-standard manifest fields are removed, and pipeline artifacts relocate to `.codex/superpipelines/`. Skills move to a cross-platform `.agents/skills/` directory shared by all tiers.
+
+<release_entry version="2.2.2" status="STABLE">
+
+### Added
+
+- **Design spec for Codex native layout** — `docs/superpowers/specs/2026-06-09-codex-native-layout-design.md` documents the migration rationale, path mapping, and scope root changes.
+
+### Changed
+
+- **Agent TOMLs** (parity-test-e, parity-test-f) — replaced `skills = ["name"]` with scalar `instructions = """..."""` per Codex spec; removed non-standard `version`/`plugin_version` fields.
+- **Codex plugin manifest** (`.codex-plugin/plugin.json`) — removed `"agents"` and `"commands"` fields (not part of the Codex manifest spec); `"skills"` path updated to `"../.agents/skills/"`.
+- **Codex scope root** — migrated from `.agents/codex/` to `.codex/`; all pipeline artifacts, registry, and agent TOMLs relocated accordingly.
+- **Skills directory** — moved from `.agents/codex/skills/` to `.agents/skills/` (cross-platform tier-agnostic skill discovery).
+- **All path references updated** — `protocol_skill` paths in topology.json, entry-skill protocol references (`{ROOT}/skills/` → `{ROOT}/../.agents/skills/`), and launcher-document scope descriptions updated to reflect the new layout.
+
+### Documentation
+
+- **Design spec** — `docs/superpowers/specs/2026-06-09-codex-native-layout-design.md` (design rationale, path mapping, and scope root migration).
+
+</release_entry>
+
+## v2.2.1 — Phase-Skip Safety Hardening (2026-06-04)
+
+Closes a live-orchestration defect (#45) in `running-a-pipeline`: a run could drift from the canonical phase order, invent a non-existent "no-active-run" phase, and skip the pre-dispatch safety phases (0.6 portability, 0.7 run-safety tripwire). The fix is structural — the total phase order is stated at the top of the protocol, a phase-manifest `TodoWrite` makes any skip user-visible, and a Phase 3 precondition HARD-STOPs dispatch if the safety phases are absent from a persisted phase ledger.
+
+<release_entry version="2.2.1" status="STABLE">
+
+### Fixed
+
+- **Phase-skip during live orchestration (#45)** — `skills/running-a-pipeline/SKILL.md` could execute phases out of order and bypass 0.6/0.7 before dispatch. No runtime observer existed to catch it (the auditor checks definitions; CI checks JSON/file existence; guardrails were prose HARD-GATEs self-enforced by the drifting model).
+
+### Safety
+
+- **Phase Ordering Contract** lifted to the top of the protocol — total order `0 → 0.25 → 0.4 → 0.45 → 0.5 → 0.6 → 0.7 → 1 → 2 → 3 → 4` stated verbatim, with an explicit note that no "soft-gate"/"no-active-run" phase exists.
+- **Mandatory phase-manifest `TodoWrite`** at Phase 0 — 11 todos, one per phase; a skipped or out-of-order todo is a visible defect the user can intervene on.
+- **Phase 3 dispatch precondition** — HARD-STOPs when `0.6`/`0.7` are absent from the in-session phase ledger; the ledger is persisted to `metadata.phases_executed` at Phase 2 so a resume cannot re-enter dispatch with the safety phases missing. Two new red-flag entries codify the failure mode.
+
+</release_entry>
+
+## v2.2.0 — On-Demand Pipeline Optimizer (2026-06-03)
+
+Adds an on-demand workflow to optimize an existing pipeline: a read-only `pipeline-optimizer` surveys topology, model-tier cost, past-run signals, and protocol quality; a 4D → brainstorm → grill discovery session locks an `optimization_plan`; and the approved plan is batch-applied atomically through the existing mutation + `change-models` engines with snapshot + git checkpoint, all-or-nothing promotion gated by `pipeline-auditor` DELTA + full audits, and a graph-integrity check. Plus an opt-in `SubagentStop` telemetry hook that feeds cost/latency signals into future runs.
+
+<release_entry version="2.2.0" status="STABLE">
+
+### Added
+
+- **`optimizing-a-pipeline` + `/superpipelines:optimize-pipeline`** — orchestration skill (Phases 0–5) and command wrapper. Selection → no-active-run soft gate → optimizer survey → discovery session → single plan-gate → atomic batch-apply → mandatory post-apply proof. Orchestration is top-level only (`SUB_AGENT_SPAWNING: FALSE`).
+- **`pipeline-optimizer` agent + protocol** — read-only four-axis analyst (topology / model-tier cost / past-run signals / protocol quality). Read-only render-inline (#33); omits `isolation` (#31); declares `model_tier: deep` not `model:`; isolation/compliance delegated to `pipeline-auditor` (`DEPENDENCY_INVERSION`).
+- **Opportunity taxonomy reference** — heuristics catalogue (symptom · discriminator · false-positive guard · suggested engine) with a Table of Contents.
+- **`sk-pipeline-grilling` `MODE=optimization`** — convergent one-opportunity-at-a-time reconciliation with a zero-unresolved HARD GATE; emits `optimization_plan`.
+- **Opt-in `subagent-telemetry` hook** — `SubagentStop` capture to `run-telemetry.jsonl`; ships disabled (model can't see per-subagent token counts — #21837/#22625), fail-open, BOM-free.
+
+### Safety
+
+- **Atomic batch-apply** — snapshot to `edit-{ts}/backup/` + git checkpoint precede any write; all changes staged in one `edit-{ts}/`; SEV-0/1 == 0 gates both the pre-promote DELTA and post-promote full audits; all-or-nothing promotion with rollback on any audit/graph/promotion failure; `plugin_version` re-stamped and `topology.metadata.optimization` recorded.
+
+### Documentation
+
+- **Design spec + implementation plan** — `docs/superpowers/specs/2026-06-03-optimizing-a-pipeline-design.md` and `docs/superpowers/plans/2026-06-03-optimizing-a-pipeline.md`.
+- **`AIBOARDING.md` sync** — updated for the optimizer feature, the run-safety audit gate (#37), and the subagent-telemetry blind-spot gotcha.
+
+</release_entry>
+
+## v2.1.3 — Run-Safety Audit Gate (2026-06-02)
+
+Adds a pre-run safety tripwire that refuses to launch a drifted pipeline before any dispatch, a deterministic atomic `platform_profile` merge replacing a fragile field-by-field transcription pattern, a defensive finalization backstop for stale-status runs, a finalize-and-cleanup option for abandoned complete runs, hardened fail-fast prohibitions for the #31 worktree artifact-loss gate, and a Fix 11 audit template for the same class of defect.
+
+<release_entry version="2.1.3" status="STABLE">
+
+### Added
+
+- **Phase 0.7 — Pre-run safety tripwire** — cheap inline read-only fast-path between Phase 0.6 and Phase 1. Version-conditioned arming compares `pipeline.plugin_version` vs `installed_version`. Detection uses a single load-bearing discriminator: steps with `isolation: worktree` + every output under `superpipelines/temp/` + no host-anchor note. HARD-STOP + redirect to `/superpipelines:audit-steps` (Fix 11). Gates both fresh launches and resumed runs.
+- **Phase 1 finalize-and-cleanup** — unfinalized complete runs (all steps done, top-level `running`) get a third resume-prompt action: atomic stamp `completed` then clean up.
+- **Fix 11 template** — checkpointed audit fix for #23/#24 worktree artifact-loss deviations.
+
+### Fixed
+
+- **Deterministic atomic `platform_profile` merge** — replaces fragile field-by-field transcription with a `python3` atomic `.tmp`+`os.replace` injection. Removes the root cause of garble corruption in state-file metadata.
+- **Phase 4 defensive finalization backstop** — stale `running` status on fully-completed runs is stamped `completed` before cleanup evaluation. Only when every step is `completed` (shares predicate with Phase 1 finalize).
+- **#31 fail-fast gate hardened** — strict 5-step stop/no-copy/no-redispatch/escalate/redirect sequence with two new anti-rationalizations codified.
+- **AUDIT criterion-count references synced** — stale `28-criterion` and `criteria 1–22` literals replaced with matrix-pointer prose.
+
+### Changed
+
+- **Phase ordering** — `0.7` inserted between `0.6` and `1`.
+- **Red Flags + rationalization table** — two entries each for the hardened fail-fast prohibitions.
+
+### Documentation
+
+- **Discriminating fixture** — `skills/pipeline-auditor-references/references/fixtures/discriminating-power/wt-legacy-data-agent-worktree.md` exercises the detection discriminator identically across Phase 0.7, Fix 11, and the fixture.
+- **Design spec + implementation plan** — `docs/superpowers/specs/2026-06-02-run-safety-audit-gate-design.md` and `docs/superpowers/plans/2026-06-02-run-safety-audit-gate.md`.
+
+</release_entry>
+
+## v2.1.2 — Audit Report Ownership & permissionMode Consistency (2026-06-01)
+
+Closes a frontmatter-vs-protocol split-brain surfaced during an `/superpipelines:audit-steps` run: the read-only auditor's protocol implied it wrote its own report, persistence ownership was ambiguous, and nobody ensured the `audit/` directory existed before the orchestrator's first write. Also aligns the `permissionMode` of file-producing agents (`pipeline-architect`, `skill-architect`) with their `tools:` capability and write protocols, generalizing the architect authoring rule to a capability-based mapping.
+
+<release_entry version="2.1.2" status="STABLE">
+
+### Fixed
+
+- **Audit-steps report-ownership split-brain (#33)** — the `pipeline-auditor` protocol framed writing the report as its primary action behind a never-false "if `Write` is disallowed" fallback, despite the agent permanently carrying `disallowedTools: Write`; real persistence ownership lived only in the command file, and no party owned ensuring the `audit/` directory exists, so the orchestrator's first write on a fresh pipeline failed. The auditor protocol now declares it read-only (renders the report inline, hands the orchestrator a registry-update instruction), and the audit-steps command makes the orchestrator ensure `audit/` exists **before** writing `latest.md`, with a fail-surface fallback.
+- **Agent `permissionMode` vs capability/protocol contradiction** — `pipeline-architect` and `skill-architect` are file-producers yet declared `permissionMode: plan`, contradicting their `tools:` allowlist and write protocols. Both corrected to `acceptEdits`; the architect authoring rule is generalized to map `permissionMode` by capability (`plan` for read-only/advisory agents, `acceptEdits` for file-producers). All 7 agents are now consistent. Framed as a consistency fix, not a verified runtime write-failure.
+
+### Documentation
+
+- **Design spec + implementation plan** — `docs/superpowers/specs/2026-06-01-audit-steps-report-ownership-design.md` and `docs/superpowers/plans/2026-06-01-audit-steps-report-ownership.md`.
+
+</release_entry>
+
+## v2.1.1 — Worktree Artifact Safety & Fail-Fast (2026-06-01)
+
+Closes a sub-agent worktree isolation flaw (#31) that silently destroyed artifacts written to gitignored paths and triggered catastrophic orchestrator token bleed via inline re-execution. The fix reclassifies data agents to omit worktree isolation, host-anchors artifacts for legitimate code-writers, makes the runner fail-fast on missing artifacts, and adds auditor detection so new pipelines cannot ship the flaw.
+
+<release_entry version="2.1.1" status="STABLE">
+
+### Fixed
+
+- **Sub-agent worktree artifact data loss + orchestrator token bleed (#31)** — a pure data agent under `isolation: worktree` writing only to the gitignored `superpipelines/temp/` tree made zero tracked changes, so Claude Code auto-cleaned the worktree on teardown and destroyed the only copy of the artifact; the orchestrator's copy-back then failed and re-ran the entire subagent protocol **inline in the root session**, flooding the main context window. Resolved by four coordinated changes:
+  - **(B, primary)** Data/artifact-only agents **omit `isolation`** and run in the parent host cwd. The architect (`creating-a-pipeline` Phase 4) classifies each step by a tracked-code-write test; only code-modifying steps get `isolation: worktree`. Documented in `agent-frontmatter-schema` and `sk-pipeline-patterns`. Corrects an earlier prescription of the non-existent `isolation: none` value.
+  - **(A)** Host-anchored artifacts — `sk-pipeline-paths` adds `RESOLVE_HOST_WORKSPACE()` (main-worktree root via `git rev-parse --git-common-dir`); worktree code-writers that emit artifacts write to the host temp path registered in `additionalDirectories`, and the fragile post-DONE copy-back is removed.
+  - **(C)** Runner fail-fast — a `DONE` with a missing declared artifact is a hard `BLOCKED` escalation; inline re-execution is explicitly forbidden (`escalation.md` anti-pattern).
+  - **(D)** Auditor detection — `pipeline-auditor` criterion #23 (SEV-0: worktree step with gitignored output, no host-anchor) and #24 (SEV-1: data agent carrying unnecessary `isolation: worktree`), enforced on `/audit-steps` and the post-mutation auto-audit.
+- **Live flaw in shipped examples** — the CC `parity-test-b` example agents (`analyzer`, `reporter`, `reviewer`) carried `isolation: worktree` as pure data agents; corrected to the canonical omit-isolation reference configuration.
+
+### Documentation
+
+- **Design spec + implementation plan** — `docs/superpowers/specs/2026-06-01-worktree-artifact-safety-design.md` and `docs/superpowers/plans/2026-06-01-worktree-artifact-safety.md`.
+
+</release_entry>
+
+## v2.1.0 — Pipeline Grilling Gate & Opus 4.8 (2026-05-29)
+
+Pipeline creation now hardens the brief through an adversarial crawl/grill/reconcile interrogation before the architect designs the topology, closing knowledge gaps that previously surfaced only at build time. This release also moves the Claude Code deep tier to Opus 4.8 and adds an agent-onboarding document.
+
+<release_entry version="2.1.0" status="STABLE">
+
+### Added
+
+- **`sk-pipeline-grilling` skill** — brief-hardening interrogation run during pipeline creation. `MODE=brief` runs A0 pipeline-type determination (project-embedded vs self-contained) → A1 conditional silent crawl (codebase scan only when project-embedded; registry + capability scans always run) → A2 one-question-at-a-time grill → A3 reconciliation HARD GATE, returning a `hardened_brief`. `MODE=architectural` runs a lighter post-pattern tradeoff-confirmation pass. Orchestrator-loaded (`disable-model-invocation: true`, `user-invocable: false`); profile-driven (no hardcoded platform names or model IDs).
+- **`AIBOARDING.md` + enforcement hooks** — compressed agent-onboarding doc at the repo root and the `.aiboarding/hooks/` SessionStart / PreToolUse / PostToolUse hooks that keep it loaded and flag drift.
+
+### Changed
+
+- **`creating-a-pipeline` grilling gate** — Phase 2 runs `GRILL(MODE=brief)` before the 4D step and architect dispatch; Phase 3 runs `GRILL(MODE=architectural)` after pattern selection; Phase 4 threads `captured_failure_modes` + `pipeline_type` into the architect; Phase 6 stamps `topology.json metadata.grilling`. The legacy "≥3 critical slots missing" hard-gate is subsumed by the grilling exit bar and removed. `using-superpipelines` references the new skill.
+- **CC deep tier → Opus 4.8** — `tier_1.json` `deep` model `claude-opus-4-7` → `claude-opus-4-8` (also in `CLAUDE.md` and the `change-models` catalog). `model_tiers_version` advanced to `2026-05-29` on the `tier_1` (Claude Code) profile — the only catalog that changed.
+- **All manifests at `2.1.0`** — every per-platform manifest plus the Codex marketplace subdirectory manifest and all five `profile_version` fields. `.codex-plugin/plugin.json` and `gemini-extension.json` had drifted at `2.0.0` and are now resynced. The marketplace catalog root version stays `1.0.0`.
+- **Release process** — `.claude/skills/release.md` now tracks the Codex marketplace subdirectory manifest (`plugins/superpipelines/.codex-plugin/plugin.json`).
+- **Skill authoring pass across all 34 `SKILL.md` files (#25)** — descriptions restructured to triggering-conditions-only form; redundant `<overview>` blocks and duplicate blockquotes removed; voice normalized to third-person impersonal; concrete-example gaps filled; time-sensitive markers removed; UTF-8 BOM / mojibake in `sk-model-migration` fixed; assorted stale-value corrections. Net −55 lines, zero behavioral change.
+
+### Fixed
+
+- **Manifest version drift** — `.codex-plugin/plugin.json` and `gemini-extension.json` realigned from `2.0.0` to the current plugin version.
+
+### Documentation
+
+- **README** — copy update (#20) plus a note on the brief-hardening grilling gate.
+
+</release_entry>
+
+## v2.0.0 — Multi-Platform Release (2026-05-26)
+
+### Highlights
+
+Superpipelines runs on **five execution tiers** spanning Claude Code, OpenCode, Codex, Cursor, Windsurf, Cline, and Antigravity CLI 2.0. Project consolidated to a single repo; OpenCode (Tier 1b) remains a supported platform in the resolver but is not shipped with a packaged installer in this distribution.
+
+### Multi-platform execution model
+
+| Tier | Platform | Subagent primitive |
+|------|----------|--------------------|
+| 1 | Claude Code | Skill-callable `Task()` |
+| 1b | OpenCode | `mode: subagent` agents |
+| 1c | Antigravity CLI 2.0 | Dynamic Subagents (aspirational) |
+| 1d | Codex App/CLI | Native model-driven subagents (up to 6 concurrent) |
+| 2 | Cursor / Windsurf / Cline | Single-agent inline via `sk-platform-dispatch` |
+
+### Universal installer
+
+```bash
+# macOS / Linux / WSL
+curl -fsSL https://raw.githubusercontent.com/gustavo-meilus/superpipelines/main/install.sh | bash
+
+# Windows PowerShell
+irm https://raw.githubusercontent.com/gustavo-meilus/superpipelines/main/install.ps1 | iex
+
+# Pick one platform
+node bin/install.js --only claude-code
+```
+
+Auto-detects every supported platform. Use `--list` to see detection results, `--dry-run` to preview commands, `--all` to install for every detected platform.
+
+### OpenCode-originated improvements (backported to CC)
+
+- **Per-step model preference** in the pipeline creation flow. Deep tier → `claude-opus-4-7`; fast tier → `claude-sonnet-4-6`.
+- **Run Launcher artifact** `<scope-root>/superpipelines/pipelines/{P}/{P}.md` (launcher document; on CC this is a discovery file, not a slash command — `/superpipelines:{P}` direct invocation remains OpenCode-only in v2.0.0).
+- **Version-compatibility advisory** at run start.
+- **`plugin_version` stamping** in `pipeline-state.json`.
+
+### Write/Review isolation — degradation made explicit
+
+The `WRITE_REVIEW_ISOLATION` invariant is now tier-aware:
+
+- **Tier 1 (CC)** — structural, enforced via agent `tools:` frontmatter.
+- **Tier 1b (OC)** — structural, enforced via `permission: { edit: deny }`.
+- **Tier 1d (Codex)** — structural via TOML `sandbox_mode = "read-only"` on the reviewer agent. Release-process parity gate verifies the write-deny behavior before each release tag.
+- **Tier 2 (Cursor/Windsurf/Cline)** — convention-only. Reviews are advisory. The orchestrator surfaces this degradation at run start (stderr advisory) and run end (state-file footer + entry-skill summary).
+
+### Breaking changes
+
+- `WRITE_REVIEW_ISOLATION: TRUE` invariant removed. Replaced by tier-aware `STRUCTURAL_ON_TIER1_1B_1D; CONVENTION_ONLY_ON_TIER2`. Tooling that hard-asserted the boolean form must update.
+- New `metadata.tier` and `plugin_version` fields required at state init. Pre-v2.0.0 runs without these fields surface informational notes at resume; do not block.
+- Generated entry skills now route through `sk-platform-dispatch` DISPATCH instead of direct `Task()`. Policy:
+  - **Existing pre-v2.0.0 entry skills:** automatically regenerated on first run after v2.0.0 upgrade by Phase 0.4 (migration). The pre-v2 entry skill is archived to `<scope-root>/superpipelines/pipelines/{P}/entry-skill.pre-v2-backup.md` for audit. Direct `Task()` calls in pre-v2 entry skills do not consume `state.metadata.resolved_models[step_id]`; regeneration is required for the per-step model-tier system to take effect. (Q13: retraction of earlier "no forced regeneration" claim — that promise produced silent intent erasure on every upgrade scenario.)
+  - **Cross-tier portability (running a CC-scaffolded pipeline on Tier 1b/1c/1d/2):** REQUIRES regenerating the entry skill with the v2.0.0 architect — raw `Task()` calls do not dispatch correctly on non-CC tiers.
+  - **New pipelines (v2.0.0+):** architect emits DISPATCH-routed entry skills by default; no action needed.
+- `CLAUDE.md` Project Version jumps from `v1.2.0` (stale) to `v2.0.0`. Plugin manifest version (`1.0.6` → `2.0.0`) is now the source of truth.
+
+### Parity test suite
+
+A 10-pipeline cross-tier validation suite ships with v2.0.0. Each pipeline is scaffolded in its own scope root and verifies the full SDD artifact chain (agents, skills, topology, registry, spec/plan/tasks):
+
+| Pipeline | Tier | Platform | Codex run confirmed |
+| :--- | :--- | :--- | :--- |
+| parity-test-a | 1 | Claude Code | — |
+| parity-test-b | 1 | Claude Code | — |
+| parity-test-c | 1c | Antigravity CLI 2.0 | — |
+| parity-test-d | 1c | Antigravity CLI 2.0 | — |
+| parity-test-e | 1d | Codex App/CLI | ✅ |
+| parity-test-f | 1d | Codex App/CLI | ✅ |
+| parity-test-g | 2 | Cursor | — |
+| parity-test-h | 2 | Cursor | — |
+| parity-test-i | 1b | OpenCode | — |
+| parity-test-j | 1b | OpenCode | — |
+
+### Known limitations
+
+- `--uninstall` flag stub (full uninstall deferred to v2.1).
+- `--with-init` flag reserved (no-op).
+- Tier 1c (Antigravity Dynamic Subagents) aspirational — falls back to Tier 2 unless dispatch primitive verified.
+- Tier 1d (Codex) `sandbox_mode` per-agent isolation is structural; the release-process parity gate verifies write-deny behavior before each tag (Q8 reconciliation).
+- **F-AGY-01** — `agy plugin validate` reports "hooks: skipped (not found)". Dual incompatibility: `${CLAUDE_PLUGIN_ROOT}` in `hooks.json` is CC-only (AGY uses `${extensionPath}`); `hookSpecificOutput` payload format is CC-only. Fix requires AGY-specific hook files; blocked pending official AGY docs being accessible.
+- **F-COD-03** — Codex `workspace-write` sandbox requires Hyper-V (unavailable on Windows 11 Home). Parity runs on Home SKU require `--sandbox danger-full-access`. No code change needed; host capability gap.
+- **F-CC-02** — `effort_tier` on CC agents is silently ignored (`effort_field_name: null` in tier_1.json). Non-blocking; CC uses `model_tier` for capacity selection only.
+- Codex installer command syntax verified on Codex CLI 0.142.5: `codex plugin marketplace add gustavo-meilus/superpipelines` followed by `codex plugin add superpipelines@superpipelines-marketplace` (see `docs/agents/verification/codex-install-2026-07.md`).
+- No automated cross-platform parity gate. Per-platform validation is manual.
+- Kiro (AWS) is not supported in v2.0.x. Kiro 0.9 (Feb 2026) is a viable Tier 1e target but is explicitly out-of-scope per spec NG6; scoped for v2.1+.
+
+### Deprecations
+
+- **Gemini CLI** as a distribution target. Runtime retires June 18, 2026. Migrate to Antigravity CLI 2.0 via `agy plugin import gemini`.
+
+### Upgrade path
+
+Existing Claude Code users:
+
+```bash
+claude plugin update superpipelines
+```
+
+Or re-run the installer to pull v2.0.0 plus any newly detected platforms:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gustavo-meilus/superpipelines/main/install.sh | bash
+```
+
+### Full changelog
+
+See `CHANGELOG.md`.
+
+## v1.0.6 — Lean Agents & Zero-Body Architecture (2026-05-20)
+
+This release introduces the Lean Agents pattern: agent files become pure frontmatter configuration envelopes, and all operational protocol moves into companion `{agent-name}-protocol` skills. Every framework agent is now a zero-body stub, enforcing a clean contract between configuration and behavior.
+
+<release_entry version="1.0.6" status="STABLE">
+
+### Added
+- **7 Protocol Skills** — Companion `{agent-name}-protocol/SKILL.md` created for every framework agent: `pipeline-architect-protocol`, `pipeline-auditor-protocol`, `pipeline-failure-analyzer-protocol`, `pipeline-quality-reviewer-protocol`, `pipeline-spec-reviewer-protocol`, `pipeline-task-executor-protocol`, `skill-architect-protocol`. Each uses `disable-model-invocation: true` and `user-invocable: false` and carries the full operating modes, protocol steps, invariants, rationalization tables, and reference file links previously embedded in the agent body.
+- **`LEAN_AGENTS: TRUE` Invariant** — Added to `CLAUDE.md` as a core architecture invariant. Agent files are frontmatter-only; zero body text is permitted after the closing `---`.
+- **Release Skill** — Added `.claude/skills/release.md` with an 8-step release workflow covering version discovery, user-gated version selection, commit categorization, multi-file version bumping, changelog authoring, staged approval gate, git tagging, and GitHub release publication.
+
+### Changed
+- **Zero-Body Agents** — All 7 framework agents reduced to frontmatter-only stubs. Versions bumped: `pipeline-architect` and `pipeline-auditor` to `3.0`; all others to `2.0`.
+- **`CLAUDE.md`** — `Constraints` updated from "agent bodies ≤150 lines" to "agent bodies are empty (frontmatter only)". Protocol Skills file-layout rule added.
+- **`agent-frontmatter-schema.md`** — Replaced "Capability contract (agent body)" section with "Protocol skill companion" section documenting the zero-body stub pattern. Updated `skills` field rule and all `bypassPermissions` guidance to reference the protocol skill instead of the agent body.
+- **`compliance-matrix.md`** — Added criterion 10a (agent body must be empty); updated criterion 10 (`bypassPermissions` justification now in protocol skill); updated criterion 18 to cover protocol skill bodies.
+- **`pipeline-architect-protocol`** — DESIGN constraint and DEVELOP section updated to generate zero-body stubs with companion protocol skills for every new pipeline agent.
+- **`.gitignore`** — Removed `.claude/` ignore rule; the `.claude` directory is now fully tracked.
+- **README** — Dual-theme local SVG architecture diagrams replace external `mermaid.ink` image URLs; prose restructured and humanized.
+
+### Fixed
+- **Marketplace Schema** — Added missing `owner.email` and `author.email` fields to `marketplace.json` to satisfy strict JSON schema validation requirements.
+
+</release_entry>
+
+## v1.0.5 — Plugin Version Stamping & Model Change Command (2026-05-12)
+
+This release enforces a critical governance invariant — `plugin_version` stamping across all pipeline artifacts — and introduces the interactive `/superpipelines:change-models` command for runtime model reassignment.
+
+<release_entry version="1.0.5" status="STABLE">
+
+### Added
+- **Plugin Version Stamping**: Added `PLUGIN_VERSION_STAMPING` as a core pipeline invariant. Every pipeline artifact (`topology.json`, `registry.json` entries, `pipeline-state.json`, agent frontmatter) must now include a `plugin_version` field set to the current superpipelines package version. This field is updated on every mutation (create, add-step, update-step, delete-step) and enables future retro-compatibility checks.
+- **`/superpipelines:change-models` Command**: New interactive command for changing LLM models assigned to pipeline step agents. Discovers models from OpenCode Zen, Go, and custom providers, then applies changes to agent frontmatter.
+- **Compliance Criterion #21**: Added `plugin_version` presence and consistency check to the compliance matrix. Missing → SEV-2. Topology/agent mismatch → SEV-3.
+
+### Changed
+- **Topology Schema**: `plugin_version` is now a required top-level field in `topology.json` schema. Missing → SEV-2.
+- **Pipeline Skills Updated**: `adding-a-pipeline-step`, `creating-a-pipeline`, `deleting-a-pipeline-step`, `updating-a-pipeline-step` — all updated to include `plugin_version` stamping instructions.
+- **Reference Docs Updated**: `agent-frontmatter-schema.md`, `compliance-matrix.md`, `topology-rules.md` — all updated to document the new `plugin_version` field and rules.
+
+</release_entry>
+
+## v1.0.4 — OMOA Integration & Hierarchical Context (2026-05-05)
+
+This release integrates three major architectural enhancements inspired by the Oh My OpenAgent ecosystem, dramatically improving edit stability, context efficiency, and cost-to-performance ratios for specific agents.
+
+<release_entry version="1.0.4" status="STABLE">
+
+### Added
+- **Hashline Protocol**: Added `sk-hashline-protocol` skill and updated the `pipeline-task-executor` to enforce hash-anchored code modifications, preventing source code corruption from stale line edits.
+- **Hierarchical Context Command**: Added the `/superpipelines:init-deep` command and `sk-hierarchical-context` skill to map repository architecture into distributed `PIPELINE-CONTEXT.md` files, ensuring agents access lean, localized context without bloating global prompts.
+- **Scribius Formatting Enforcement**: Enforced strict Scribius v1 standards (H1-first, XML-anchored structured envelopes, third-person voice) on all generated `PIPELINE-CONTEXT.md` files.
+- **Dynamic Intent Routing**: Added `sk-dynamic-routing` to permit intent-based LLM selection. `pipeline-architect` now defaults to `claude-opus-4-7` (`deep-plan` category) and `pipeline-quality-reviewer` routes to `claude-haiku-4-5-20251001` (`quick-audit` category), while standard implementation workers remain bound to `claude-sonnet-4-6`.
+
+### Changed
+- **Architecture Invariant Updated**: `MODEL_SELECTION: SONNET_ONLY` updated to `MODEL_SELECTION: DYNAMIC_DEFAULT_SONNET` to support category-based routing.
+- **New Pipeline Preflight**: The `/superpipelines:new-pipeline` command now explicitly checks for a root context map and suggests `/superpipelines:init-deep` during the preflight phase.
+
+</release_entry>
+
+## v1.0.3 — Adherence Cleanup (2026-05-04)
+
+This release ensures 100% adherence to the framework's core architectural standards. It resolves cosmetic and structural issues identified during a comprehensive audit, including stale marketplace metadata, corrupted agent definitions, and structural inconsistencies in the release history.
+
+<release_entry version="1.0.3" status="STABLE">
+
+### Added
+- **Adherence Audit Verified**: Confirmed 100% compliance with all 16 core architectural requirements (Git preflight, multi-pipeline isolation, scope-aware pathing, temp lifecycle).
+
+### Improved
+- **Marketplace Metadata**: Synchronized marketplace description with canonical plugin capabilities, removing stale documentation references.
+- **Structural Integrity**: Resolved file corruption in `skill-architect.md` and consolidated duplicate history headers in `RELEASE-NOTES.md`.
+
+</release_entry>
+
+## v1.0.2 — Scribius v1 & Standardized Architecture (2026-05-04)
+
+This release implements a repository-wide refactoring to the Scribius v1 documentation standard and finalizes the v2 scope-aware architecture. It introduces semantically anchored XML envelopes for machine-readability and master manifests for high-performance context retrieval.
+
+<release_entry version="1.0.2" status="STABLE">
+
+### Added
+- **Scribius v1 Standardization**: All 20+ core skills migrated to semantically anchored XML envelopes (`<overview>`, `<protocol>`, `<invariants>`, `<rationalization_table>`).
+- **AI-Ready Indexing**: Added `llms.txt` and `llms-full.txt` master manifests for optimized LLM context injection.
+- **Integrity Verification**: Verified 100% semantic alignment between pre-refactor baselines and standardized documentation via a multi-agent audit protocol.
+- **Automated Registry**: Added `generate_llms_full.py` script for periodic manifest updates.
+- **Scope-aware deployment**: Pipelines support `project`, `local`, and `user` scopes with path resolution via `sk-pipeline-paths`.
+- **Multi-pipeline support**: Multiple named pipelines coexist per workspace in isolated directories.
+- **Step management commands**: `/superpipelines:new-step`, `/superpipelines:update-step`, and `/superpipelines:delete-step` enable granular pipeline mutations.
+- **Compliance Matrix**: A 20-criterion audit system for layout, frontmatter, topology, and runtime safety.
+- **Local Memory**: Agents may utilize `memory: local` for persisting cross-run heuristics.
+
+### Improved
+- **Protocol Clarity**: Refined operational gates in `systematic-debugging`, `tdd`, and `verification-before-completion` for sharper agent adherence.
+- **Structural Voice**: Standardized all documentation to third-person impersonal voice to reinforce protocol objectivity.
+
+### Breaking changes
+- **State file path moved**: Pipeline state now lives at `<scope-root>/superpipelines/temp/{P}/{runId}/pipeline-state.json` instead of `tmp/pipeline-state.json`. There is no migration path — any in-progress pipelines from v1.0.0 must be restarted.
+- **State schema extended**: `pipeline-state.json` now requires `pipeline_name`, `scope_root`, and `run_id` fields.
+- **`.claudeignore` updated**: The ignore pattern changed from `tmp/pipeline-*` to `.claude/superpipelines/temp/`.
+- **Agent `permissionMode` now required**: All agents declare `permissionMode` in frontmatter (`acceptEdits` for executors, `plan` for reviewers/architects).
+
+### Removed
+- `docs/AI_PIPELINES_LLM.md` — Replaced by `ai-pipelines-trimmed.md` and agent-frontmatter-schema.
+- `docs/ai-pipelines-improvement-plan.md` — Legacy gap analysis.
+- `docs/superpowers-vs-ai-pipelines.md`, `docs/claude-plugins-complete-guide.md`, `docs/testing.md`.
+- `docs/windows/`, `docs/plans/`, `docs/superpowers/`, `docs/examples/` — Legacy directories.
+- `tests/` — Legacy Superpowers-era test suites.
+- Visual companion server scripts from `skills/brainstorming/`.
+
+</release_entry>
+
+## v1.0.0 — Initial Release (2026-05-03)
+
+<release_entry version="1.0.0" status="INITIAL">
+First standalone release of Superpipelines. Established the core framework with 7 agents, 6 execution patterns, and the spec-driven development (SDD) workflow.
+</release_entry>
